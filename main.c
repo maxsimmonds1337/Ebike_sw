@@ -14,6 +14,8 @@ void ADC_EN(void);
 //#define DB6 1<<4
 //#define DB7 1<<5
 
+#define throttle_scale 0.00080586  // 12 bit adc, 3v3 is full scale
+
 struct IO_Expander {
 	
 	unsigned char E:1;
@@ -32,8 +34,12 @@ static const struct IO_Expander IO_Clear;
 
 int speed, throttle = 0;
 
+int digits[4]; // this will store the digits
+
 //main loop
 int main(void){
+	
+	int i = 0;
 	
 	delay(400); //wait 15ms
 	
@@ -86,14 +92,16 @@ LCD_Write(0x32,1);
 LCD_Write(0x01,1);
 LCD_Write(0x0C,1);
 LCD_Write(0x06,1);
-LCD_Write('S', 0x0);
-LCD_Write('P', 0x0);
-LCD_Write('E', 0x0);
-LCD_Write('E', 0x0);
-LCD_Write('D', 0x0);
-LCD_Write(' ', 0x0);
 
 	while(1){
+		
+		LCD_Write('S', 0x0);
+		LCD_Write('P', 0x0);
+		LCD_Write('E', 0x0);
+		LCD_Write('E', 0x0);
+		LCD_Write('D', 0x0);
+		LCD_Write(' ', 0x0);
+
 
 	  if(speed == 9){
 			speed = 0;
@@ -102,8 +110,6 @@ LCD_Write(' ', 0x0);
 		}
 	  
 		LCD_Write('0' + speed, 0x0); // turn off LED
-		delay(1000);
-		LCD_Write(0x10, 0x1);
 		
 		ADC1->CR |= ADC_CR_ADSTART;
 		
@@ -112,6 +118,26 @@ LCD_Write(' ', 0x0);
  /* For robust implementation, add here time-out management */
 		}
 		throttle = ADC1->DR;
+		
+		
+		
+		LCD_Write(' ', 0x0);
+		
+		for(i = 0; i < 4; i++) {
+			digits[i] = throttle % 10;
+			throttle /= 10;
+		}
+		
+		LCD_Write('0' + digits[3], 0x0);
+		LCD_Write('0' + digits[2], 0x0);
+		LCD_Write('0' + digits[1], 0x0);
+		LCD_Write('0' + digits[0], 0x0);
+		
+		delay(1000);
+		
+		LCD_Write(0x2, 0x1);
+		
+		
 	}
 }
 
