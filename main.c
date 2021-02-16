@@ -1,10 +1,9 @@
 #include "stm32f0xx.h"                  // Device header
-#include<stdio.h>
 
 // function prototypes
 void I2C_1_Start(void);
 void I2C_1_Write(unsigned char DATA);
-void delay (void);
+void delay (int ms);
 void LCD_Write(unsigned char DATA, unsigned char command);
 
 //#define E   1<<0
@@ -35,11 +34,7 @@ int speed = 0;
 //main loop
 int main(void){
 	
-	delay();
-	delay();
-	delay();
-	delay();
-
+	delay(400); //wait 15ms
 	
 	// AF4 for I2C1
 	// SDA PA10
@@ -69,47 +64,18 @@ int main(void){
 	I2C1->CR2 		|= slave_add << I2C_CR2_SADD_Pos << 1; // write the slave address
 	I2C1->CR1 		|= I2C_CR1_PE; // turn on the peripheral
 
-	LCD_Write(0xFF,0x1);
-	LCD_Write(0x0,0x1);
-  LCD_Write(0x3,0x1);
-	LCD_Write(0x3,0x1);
-	LCD_Write(0x3,0x1);
-	LCD_Write(0x2,0x1);
-	
-	//LCD_Write(0x28,0x1);
-	//LCD_Write(0x0C,0x1);
-	//LCD_Write(0x06,0x1);
-	//LCD_Write(0x80,0x1);
-	
-	//LCD_Write(0x1, 0x1);
-	
-//  LCD_Write(0x20,0x0);
-//  LCD_Write(0x00,0x0);
-//	LCD_Write(0x40,0x0);
-//	LCD_Write(0x00,0x0);
-//	LCD_Write(0x80,0x0);
-//	LCD_Write(0x00,0x0);
-
-//I2C_1_Write(0);
-//I2C_1_Write(1<<2);
-//I2C_1_Write(1<<3);
-//I2C_1_Write(1<<4);
-//I2C_1_Write(1<<5);
-//I2C_1_Write(0);
-//LCD_Write(0x28,1);
-//LCD_Write(0x0E,1);
-//LCD_Write(0x2, 1);
-//LCD_Write(0x6, 1);
-//LCD_Write(0x1, 1);
-
+LCD_Write(0x33,1);
+LCD_Write(0x32,1);
+//LCD_Write(0x28,1); // This seems to screw things up
+LCD_Write(0x01,1);
+LCD_Write(0x0C,1);
+LCD_Write(0x06,1);
 LCD_Write('S', 0x0);
 LCD_Write('P', 0x0);
 LCD_Write('E', 0x0);
 LCD_Write('E', 0x0);
 LCD_Write('D', 0x0);
 LCD_Write(' ', 0x0);
-
-
 
 	while(1){
 
@@ -120,28 +86,8 @@ LCD_Write(' ', 0x0);
 		}
 	  
 		LCD_Write('0' + speed, 0x0); // turn off LED
-		delay();
+		delay(1000);
 		LCD_Write(0x10, 0x1);
-
-		//LCD_Write('r', 0x0);
-		//LCD_Write('e', 0x0);
-		
-		//LCD_Write('Y', 0x0);
-		//LCD_Write('o', 0x0);
-		//LCD_Write('u', 0x0);
-		
-		//LCD_Write('O', 0x0);
-		//LCD_Write('K', 0x0);
-		//LCD_Write('?', 0x0);
-		//delay();
-		//delay();
-		//delay();
-		//delay();
-		//delay();
-		//delay();
-		//LCD_Write(0x1, 0x1);
-//		LCD_Write('j', 0x0); // turn off LED
-//		LCD_Write('a', 0x0); // turn off LED
 		
 	}
 }
@@ -160,7 +106,7 @@ void I2C_1_Write(unsigned char DATA) {
  I2C1->CR2 |= 0x1 << I2C_CR2_NBYTES_Pos; // send only one byte
  I2C1->TXDR = DATA; // send the data
  I2C1->CR2 |= I2C_CR2_START; // send start bit
- delay();
+ delay(3);
 
 }
 
@@ -211,10 +157,11 @@ void LCD_Write(unsigned char DATA, unsigned char command) {
 	
 }
 
-void delay (void) 				//create simple delay loop
+// 1ms delay
+void delay (int ms) 				//create simple delay loop
 {
 	int d;
-	for (d=0; d<20000; d++) {
+	for (d=0; d<(ms*1000); d++) {
 		__asm("NOP");
 	}
 }
