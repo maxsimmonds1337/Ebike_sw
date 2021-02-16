@@ -5,6 +5,7 @@ void I2C_1_Start(void);
 void I2C_1_Write(unsigned char DATA);
 void delay (int ms);
 void LCD_Write(unsigned char DATA, unsigned char command);
+void ADC_EN(void);
 
 //#define E   1<<0
 //#define RS  1<<1
@@ -29,7 +30,7 @@ struct IO_Expander {
 char slave_add = 0x20;
 static const struct IO_Expander IO_Clear;
 
-int speed = 0;
+int speed, throttle = 0;
 
 //main loop
 int main(void){
@@ -44,6 +45,21 @@ int main(void){
 	RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
 	// enable i2c clock (PE BIT?)
 	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
+	
+	//ADC
+	
+	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN; // enable the ADC
+	RCC->CR2 |= RCC_CR2_HSI14ON; /* (2) */
+	while ((RCC->CR2 & RCC_CR2_HSI14RDY) == 0) /* (3) */
+	{
+	 /* For robust implementation, add here time-out management */
+	}
+	ADC1->CFGR2 &= ~ADC_CFGR2_CKMODE; /* (1) */
+	
+	ADC1->CHSELR = ADC_CHSELR_CHSEL2;
+	ADC->CCR |= ADC_CCR_VREFEN;
+	
+	ADC_EN();
 	
 	// select the alternate function reg for both ios (use the AF reg later to choose i2c)
 	GPIOA->MODER	|= GPIO_MODER_MODER9_1 | GPIO_MODER_MODER10_1; // mask bit 1, to set into AF mode
@@ -89,6 +105,13 @@ LCD_Write(' ', 0x0);
 		delay(1000);
 		LCD_Write(0x10, 0x1);
 		
+		ADC1->CR |= ADC_CR_ADSTART;
+		
+		while ((ADC1->ISR & ADC_ISR_EOC) == 0) /* Wait end of conversion */
+		{
+ /* For robust implementation, add here time-out management */
+		}
+		throttle = ADC1->DR;
 	}
 }
 
@@ -164,4 +187,17 @@ void delay (int ms) 				//create simple delay loop
 	for (d=0; d<(ms*1000); d++) {
 		__asm("NOP");
 	}
+}
+
+void ADC_EN(void) {
+if ((ADC1->ISR & ADC_ISR_ADRDY) != 0) /* (1) */
+{
+ ADC1->ISR |= ADC_ISR_ADRDY; /* (2) */
+}
+ADC1->CR |= ADC_CR_ADEN; /* (3) */
+while ((ADC1->ISR & ADC_ISR_ADRDY) == 0) /* (4) */
+{
+ /* For robust implementation, add here time-out management */
+}
+	
 }
