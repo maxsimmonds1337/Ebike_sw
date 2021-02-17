@@ -1,9 +1,11 @@
 #include "stm32f0xx.h"                  // Device header
+#include <string.h>
 
 // function prototypes
 void I2C_1_Start(void);
 void I2C_1_Write(unsigned char DATA);
 void delay (int ms);
+void LCD_write_str(char *string);
 void LCD_Write(unsigned char DATA, unsigned char command);
 void ADC_EN(void);
 
@@ -30,6 +32,8 @@ struct IO_Expander {
 
 //slave address of IO expander
 char slave_add = 0x20;
+
+char display_str[16];
 static const struct IO_Expander IO_Clear;
 
 int speed, throttle = 0;
@@ -95,13 +99,8 @@ LCD_Write(0x06,1);
 
 	while(1){
 		
-		LCD_Write('S', 0x0);
-		LCD_Write('P', 0x0);
-		LCD_Write('E', 0x0);
-		LCD_Write('E', 0x0);
-		LCD_Write('D', 0x0);
-		LCD_Write(' ', 0x0);
-
+		strcpy(display_str, "Speed ");
+		LCD_write_str(display_str);
 
 	  if(speed == 9){
 			speed = 0;
@@ -121,8 +120,8 @@ LCD_Write(0x06,1);
 		
 		LCD_Write(0xC0, 0x1); // set the ddram address
 		
-		LCD_Write('V', 0x0);
-		LCD_Write('=', 0x0);
+		strcpy(display_str, "Volts = ");
+		LCD_write_str(display_str);
 		
 		throttle *= throttle_scale;
 		
@@ -137,7 +136,7 @@ LCD_Write(0x06,1);
 		LCD_Write('0' + digits[1], 0x0);
 		LCD_Write('0' + digits[0], 0x0);
 		
-		delay(1000);
+		delay(10);
 		
 		LCD_Write(0x2, 0x1);
 		
@@ -207,6 +206,18 @@ void LCD_Write(unsigned char DATA, unsigned char command) {
 	port.E = 0x0; // remove the E line
 	byte = port.E << 0 | port.RS << 1 | port.DB << 2 | port.LED << 6 | port.NC << 7;
 	I2C_1_Write(byte);
+	
+}
+
+//print a string function
+void LCD_write_str(char *string) {
+	
+	int i = 0; // used for looping
+	
+	for(i = 0; i < strlen(display_str); i++) {
+		LCD_Write(*(string+i), 0x0);
+	}
+		
 	
 }
 
