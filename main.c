@@ -14,7 +14,7 @@ void ADC_EN(void);
 //#define DB6 1<<4
 //#define DB7 1<<5
 
-#define throttle_scale 0.00080586  // 12 bit adc, 3v3 is full scale
+#define throttle_scale 0.80586  // 12 bit adc, 3v3 is full scale
 
 struct IO_Expander {
 	
@@ -86,9 +86,9 @@ int main(void){
 	I2C1->CR2 		|= slave_add << I2C_CR2_SADD_Pos << 1; // write the slave address
 	I2C1->CR1 		|= I2C_CR1_PE; // turn on the peripheral
 
-LCD_Write(0x33,1);
-LCD_Write(0x32,1);
-//LCD_Write(0x28,1); // This seems to screw things up
+//LCD_Write(0x33,1);
+//LCD_Write(0x32,1);
+LCD_Write(0x28,1); // This seems to screw things up
 LCD_Write(0x01,1);
 LCD_Write(0x0C,1);
 LCD_Write(0x06,1);
@@ -119,9 +119,12 @@ LCD_Write(0x06,1);
 		}
 		throttle = ADC1->DR;
 		
+		LCD_Write(0xC0, 0x1); // set the ddram address
 		
+		LCD_Write('V', 0x0);
+		LCD_Write('=', 0x0);
 		
-		LCD_Write(' ', 0x0);
+		throttle *= throttle_scale;
 		
 		for(i = 0; i < 4; i++) {
 			digits[i] = throttle % 10;
@@ -129,6 +132,7 @@ LCD_Write(0x06,1);
 		}
 		
 		LCD_Write('0' + digits[3], 0x0);
+		LCD_Write('.', 0x0);
 		LCD_Write('0' + digits[2], 0x0);
 		LCD_Write('0' + digits[1], 0x0);
 		LCD_Write('0' + digits[0], 0x0);
