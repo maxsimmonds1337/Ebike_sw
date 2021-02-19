@@ -30,14 +30,12 @@ Rebuild target 'Target 1'
 assembling startup_stm32f030x6.s...
 compiling system_stm32f0xx.c...
 compiling main.c...
-main.c(244): warning:  #1-D: last line of file ends without a newline
-  }
-main.c(37): warning:  #177-D: variable "IO_Clear" was declared but never referenced
+main.c(30): warning:  #177-D: variable "IO_Clear" was declared but never referenced
   static const struct IO_Expander IO_Clear;
-main.c: 2 warnings, 0 errors
+main.c: 1 warning, 0 errors
 linking...
-Program Size: Code=2992 RO-data=208 RW-data=12 ZI-data=1668  
-".\Objects\eBike_V1_0.axf" - 0 Error(s), 2 Warning(s).
+Program Size: Code=4868 RO-data=400 RW-data=12 ZI-data=1668  
+".\Objects\eBike_V1_0.axf" - 0 Error(s), 1 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -54,8 +52,8 @@ Package Vendor: Keil
 <h2>Collection of Component Files used:</h2>
 
    * Component: Keil.Standalone::Device:Startup:1.0.0
-      Source file:   MDK\Device\Source\ARM\STM32F0xx_OPT.s
       Include file:  Drivers\CMSIS\Device\ST\STM32F0xx\Include\stm32f0xx.h
+      Source file:   MDK\Device\Source\ARM\STM32F0xx_OPT.s
       Source file:   Drivers\CMSIS\Device\ST\STM32F0xx\Source\Templates\arm\startup_stm32f030x6.s
       Source file:   Drivers\CMSIS\Device\ST\STM32F0xx\Source\Templates\system_stm32f0xx.c
 Build Time Elapsed:  00:00:01

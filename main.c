@@ -5,16 +5,11 @@
 void I2C_1_Start(void);
 void I2C_1_Write(unsigned char DATA);
 void delay (int ms);
+void delay_us(int us);
 void LCD_write_str(char *string);
 void LCD_Write(unsigned char DATA, unsigned char command);
 void ADC_EN(void);
 
-//#define E   1<<0
-//#define RS  1<<1
-//#define DB4 1<<2
-//#define DB5 1<<3
-//#define DB6 1<<4
-//#define DB7 1<<5
 
 #define throttle_scale 0.80586  // 12 bit adc, 3v3 is full scale
 
@@ -28,22 +23,21 @@ struct IO_Expander {
 	
 } port;
 
-//	int sw1 = 0;
-
 //slave address of IO expander
 char slave_add = 0x20;
 
 char display_str[16];
 static const struct IO_Expander IO_Clear;
 
-int speed, throttle = 0;
+int speed = 0;
+float throttle = 0.0;
 
 int digits[4]; // this will store the digits
 
 //main loop
 int main(void){
 	
-	int i = 0;
+	volatile int i, val, duty_cycle = 0;
 	
 	delay(400); //wait 15ms
 	
@@ -51,13 +45,27 @@ int main(void){
 	// SDA PA10
 	// SCL PA9
 	
+	/***** I2C INIT *********/
 	// enable port a clock
 	RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
 	// enable i2c clock (PE BIT?)
 	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
+	// select the alternate function reg for both ios (use the AF reg later to choose i2c)
+	GPIOA->MODER	|= GPIO_MODER_MODER9_1 | GPIO_MODER_MODER10_1; // mask bit 1, to set into AF mode
+	// set gpio alternate function reg
+	GPIOA->AFR[1] |= (0x04) << GPIO_AFRH_AFSEL9_Pos; // select AF4 (i2c) on pa9
+	GPIOA->AFR[1] |= (0x04) << GPIO_AFRH_AFSEL10_Pos; // select AF4 (i2c) on pa10
+		// set output type to open drain
+	GPIOA->OTYPER |= GPIO_OTYPER_OT_9 | GPIO_OTYPER_OT_10;
+	// i2c configuration, set up using table from table 74 in referene manual
+	I2C1->CR1 		&= ~(I2C_CR1_PE); // turn off the peripheral
+	I2C1->CR1 		|= I2C_CR1_RXIE; // receive interrupt enable
+	I2C1->CR2 		|= I2C_CR2_AUTOEND; // set the auto end mode so we don't need to send the stop bit
+	I2C1->TIMINGR |= ((0x01) << I2C_TIMINGR_PRESC_Pos) | ((0xC7) << I2C_TIMINGR_SCLL_Pos) | ((0xC3) << I2C_TIMINGR_SCLH_Pos) | ((0x2) << I2C_TIMINGR_SDADEL_Pos) | ((0x4) << I2C_TIMINGR_SCLDEL_Pos);
+	I2C1->CR2 		|= slave_add << I2C_CR2_SADD_Pos << 1; // write the slave address
+	I2C1->CR1 		|= I2C_CR1_PE; // turn on the peripheral
 	
-	//ADC
-	
+	/********* ADC INIT *******/
 	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN; // enable the ADC
 	RCC->CR2 |= RCC_CR2_HSI14ON; /* (2) */
 	while ((RCC->CR2 & RCC_CR2_HSI14RDY) == 0) /* (3) */
@@ -68,46 +76,53 @@ int main(void){
 	
 	ADC1->CHSELR = ADC_CHSELR_CHSEL2;
 	ADC->CCR |= ADC_CCR_VREFEN;
-	
 	ADC_EN();
-	
-	// select the alternate function reg for both ios (use the AF reg later to choose i2c)
-	GPIOA->MODER	|= GPIO_MODER_MODER9_1 | GPIO_MODER_MODER10_1; // mask bit 1, to set into AF mode
 
-	// set output type to open drain
-	GPIOA->OTYPER |= GPIO_OTYPER_OT_9 | GPIO_OTYPER_OT_10;
 	
-	// set gpio alternate function reg
-	GPIOA->AFR[1] |= (0x04) << GPIO_AFRH_AFSEL9_Pos; // select AF4 (i2c) on pa9
-	GPIOA->AFR[1] |= (0x04) << GPIO_AFRH_AFSEL10_Pos; // select AF4 (i2c) on pa10
+	/***** LCD INIT **********/
+	LCD_Write(0x28,1); // ensure you're using 5v if using two lines displays
+	LCD_Write(0x01,1);
+	LCD_Write(0x0C,1);
+	LCD_Write(0x06,1);
 	
-	// i2c configuration, set up using table from table 74 in referene manual
 	
-	I2C1->CR1 		&= ~(I2C_CR1_PE); // turn off the peripheral
-	I2C1->CR1 		|= I2C_CR1_RXIE; // receive interrupt enable
-	I2C1->CR2 		|= I2C_CR2_AUTOEND; // set the auto end mode so we don't need to send the stop bit
-	I2C1->TIMINGR |= ((0x01) << I2C_TIMINGR_PRESC_Pos) | ((0xC7) << I2C_TIMINGR_SCLL_Pos) | ((0xC3) << I2C_TIMINGR_SCLH_Pos) | ((0x2) << I2C_TIMINGR_SDADEL_Pos) | ((0x4) << I2C_TIMINGR_SCLDEL_Pos);
-	I2C1->CR2 		|= slave_add << I2C_CR2_SADD_Pos << 1; // write the slave address
-	I2C1->CR1 		|= I2C_CR1_PE; // turn on the peripheral
+	
+	
+	/**** TIM 1 INIT********/
+	//TIM1_CH4 is the pwm
+	RCC->APB2ENR |= RCC_APB2ENR_TIM1EN; // enable the clock
+	//TIM1->PSC |= 0x1; // set the prescaler to 1, this gives 125ns ticks
+	TIM1->ARR = 400; // this gives an interrupt frequency of 20khz
+	TIM1->CCMR2 |= TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4M_1 | TIM_CCMR2_OC4M_0; // write 110 to the output compare mode, setting pwm1
+	TIM1->CCER |= TIM_CCER_CC4E; // enable channel 4
+	
+	GPIOA->MODER	|= GPIO_MODER_MODER11_1;
+	GPIOA->AFR[1] |= (0x02) << GPIO_AFRH_AFSEL11_Pos; // set port a 11 to alternate function 2 (tim1_ch4)
+	
+	TIM1->BDTR |= TIM_BDTR_MOE;
+	TIM1->EGR |= TIM_EGR_UG;
+	TIM1->CR1 |= TIM_CR1_CEN;
 
-//LCD_Write(0x33,1);
-//LCD_Write(0x32,1);
-LCD_Write(0x28,1); // This seems to screw things up
-LCD_Write(0x01,1);
-LCD_Write(0x0C,1);
-LCD_Write(0x06,1);
+	strcpy(display_str, "Speed ");
+	LCD_write_str(display_str);
+	
+	LCD_Write(0xC0, 0x1); // set the ddram address to row 2 col 1
+
+	strcpy(display_str, "Throttle = ");
+	LCD_write_str(display_str);
 
 	while(1){
 		
-		strcpy(display_str, "Speed ");
-		LCD_write_str(display_str);
-
-	  if(speed == 9){
+	
+		LCD_Write(0x86, 0x1); // set the ddram address to row 2 col 1
+	  
+		if(speed == 9){
 			speed = 0;
 		} else {
 			speed++;
 		}
 	  
+		//LCD_Write(0x6, 0x1); // set the ddram address to row 2 col 1
 		LCD_Write('0' + speed, 0x0); // turn off LED
 		
 		ADC1->CR |= ADC_CR_ADSTART;
@@ -118,31 +133,31 @@ LCD_Write(0x06,1);
 		}
 		throttle = ADC1->DR;
 		
-		LCD_Write(0xC0, 0x1); // set the ddram address
+		LCD_Write(0xC0+0xB, 0x1); // set the ddram address to row 2 col 1
+				
+		throttle /= (4095.0);
+		throttle *= 100.0;
 		
-		strcpy(display_str, "Volts = ");
-		LCD_write_str(display_str);
+		duty_cycle = 405 - 4*(unsigned int)(throttle); // set duty cycle
+
+		TIM1->CCR4 = duty_cycle;
 		
-		throttle *= throttle_scale;
-		
-		for(i = 0; i < 4; i++) {
-			digits[i] = throttle % 10;
+		for(i = 0; i < 3; i++) {
+			digits[i] = (int)throttle % 10;
 			throttle /= 10;
 		}
 		
-		LCD_Write('0' + digits[3], 0x0);
-		LCD_Write('.', 0x0);
 		LCD_Write('0' + digits[2], 0x0);
 		LCD_Write('0' + digits[1], 0x0);
 		LCD_Write('0' + digits[0], 0x0);
-		
-		delay(10);
+		LCD_Write('%', 0x0);
 		
 		LCD_Write(0x2, 0x1);
-		
+//		
 		
 	}
 }
+
 
 // sends the start bit
 void I2C_1_Start(void) {
@@ -158,7 +173,7 @@ void I2C_1_Write(unsigned char DATA) {
  I2C1->CR2 |= 0x1 << I2C_CR2_NBYTES_Pos; // send only one byte
  I2C1->TXDR = DATA; // send the data
  I2C1->CR2 |= I2C_CR2_START; // send start bit
- delay(3);
+ delay(4);
 
 }
 
@@ -230,6 +245,15 @@ void delay (int ms) 				//create simple delay loop
 	}
 }
 
+// 1ms delay
+void delay_us (int us) 				//create simple delay loop
+{
+	int d;
+	for (d=0; d<(us); d++) {
+		__asm("NOP");
+	}
+}
+
 void ADC_EN(void) {
 if ((ADC1->ISR & ADC_ISR_ADRDY) != 0) /* (1) */
 {
@@ -242,3 +266,6 @@ while ((ADC1->ISR & ADC_ISR_ADRDY) == 0) /* (4) */
 }
 	
 }
+
+//throttle *= throttle_scale;
+//		
