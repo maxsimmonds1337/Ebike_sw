@@ -30,12 +30,16 @@ Rebuild target 'Target 1'
 assembling startup_stm32f030x6.s...
 compiling system_stm32f0xx.c...
 compiling main.c...
-main.c(49): warning:  #177-D: variable "IO_Clear" was declared but never referenced
+main.c(176): warning:  #63-D: shift count is too large
+  	
+PIOA->ODR |= (nSLEEP << 
+PIO_ODR_12); // 
+main.c(51): warning:  #177-D: variable "IO_Clear" was declared but never referenced
   static const struct IO_Expander IO_Clear;
-main.c: 1 warning, 0 errors
+main.c: 2 warnings, 0 errors
 linking...
-Program Size: Code=5788 RO-data=400 RW-data=76 ZI-data=1668  
-".\Objects\eBike_V1_0.axf" - 0 Error(s), 1 Warning(s).
+Program Size: Code=5912 RO-data=400 RW-data=92 ZI-data=1668  
+".\Objects\eBike_V1_0.axf" - 0 Error(s), 2 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -56,7 +60,7 @@ Package Vendor: Keil
       Source file:   MDK\Device\Source\ARM\STM32F0xx_OPT.s
       Source file:   Drivers\CMSIS\Device\ST\STM32F0xx\Source\Templates\arm\startup_stm32f030x6.s
       Source file:   Drivers\CMSIS\Device\ST\STM32F0xx\Source\Templates\system_stm32f0xx.c
-Build Time Elapsed:  00:00:01
+Build Time Elapsed:  00:00:00
 </pre>
 </body>
 </html>

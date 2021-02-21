@@ -23,7 +23,9 @@ volatile unsigned int HAL_count, HAL_count_frozen, timer_count = 0; // used for 
 
 int Vin, Vin_largest,adc_reg = 0; // this reads the input voltage
 
+// bldc io
 
+int dir, nSLEEP, nFAULT, nBRAKE = 0;
 
 // used for delay
 int a,D = 0;
@@ -157,6 +159,28 @@ int main(void){
 	strcpy(display_str, "Throttle = ");
 	LCD_write_str(display_str);
 	
+	/****** set up the bldc io *******/
+	
+	
+	// outputs
+	
+	dir = 0x0; // 1 is backwards, 0 is forwards
+	nSLEEP = 0x1; // 0 is sleep
+	
+	//dir - pa0
+	GPIOA->MODER |= GPIO_MODER_MODER0_0; // set pa1 as an output
+	GPIOA->ODR |= (dir << GPIO_ODR_0); // set the direction of the motor
+	
+	//sleep - pa12
+	GPIOA->MODER |= GPIO_MODER_MODER12_0; // set pa1 as an output
+	GPIOA->ODR |= (nSLEEP << GPIO_ODR_12); // 
+	
+	//brake - pa3
+	GPIOA->MODER |= GPIO_MODER_MODER3_0; // set pa1 as an output
+	GPIOA->ODR |= (nBRAKE << GPIO_ODR_3); // 
+	
+	// inputs
+	//nFAULT
 	
 	while(1){
 		
