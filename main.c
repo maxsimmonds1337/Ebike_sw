@@ -1,15 +1,14 @@
 #include "stm32f0xx.h"                  // Device header
 #include <string.h>
+#include "I2C.h"
 
-// function prototypes
-void I2C_1_Start(void);
-void I2C_1_Write(unsigned char DATA);
 void delay (int ms);
 void delay_us(int us);
+
 void LCD_write_str(char *string);
 void LCD_Write(unsigned char DATA, unsigned char command);
-void ADC_EN(void);
 
+void ADC_EN(void);
 
 const int hall_counts_per_rot = 23; // number of counts per one wheel rotation
 const float wheel_diameter = 1;//  0.662; //meters
@@ -21,7 +20,7 @@ const float mps_mph = 2.23694; // m/s to m/h conversion
 volatile unsigned char LED_ON; // this is used to toggle the LED
 volatile unsigned int HAL_count, HAL_count_frozen, timer_count = 0; // used for counting
 
-int Vin, Vin_largest,adc_reg = 0; // this reads the input voltage
+int Vin, Vin_largest, adc_reg = 0; // this reads the input voltage
 
 // bldc io
 
@@ -34,26 +33,15 @@ double speed, speed_largest,speed_constant = 0.0; // var to hold the speed
 
 #define throttle_scale 0.80586  // 12 bit adc, 3v3 is full scale
 
-struct IO_Expander {
-	
-	unsigned char E:1;
-	unsigned char RS:1;
-	unsigned char DB:4;
-	unsigned char LED:1;
-	unsigned char NC:1; // not used
-	
-} port;
-
-//slave address of IO expander
-char slave_add = 0x20;
-
 char display_str[16];
-static const struct IO_Expander IO_Clear;
 
 float throttle = 0.0;
 
 int digits[4]; // this will store the digits
 volatile int duty_cycle = 0;
+
+extern char slave_add;
+extern struct IO_Expander port;
 
 //main loop
 int main(void){
@@ -66,25 +54,7 @@ int main(void){
 	// SDA PA10
 	// SCL PA9
 	
-	/***** I2C INIT *********/
-	// enable port a clock
-	RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
-	// enable i2c clock (PE BIT?)
-	RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
-	// select the alternate function reg for both ios (use the AF reg later to choose i2c)
-	GPIOA->MODER	|= GPIO_MODER_MODER9_1 | GPIO_MODER_MODER10_1; // mask bit 1, to set into AF mode
-	// set gpio alternate function reg
-	GPIOA->AFR[1] |= (0x04) << GPIO_AFRH_AFSEL9_Pos; // select AF4 (i2c) on pa9
-	GPIOA->AFR[1] |= (0x04) << GPIO_AFRH_AFSEL10_Pos; // select AF4 (i2c) on pa10
-		// set output type to open drain
-	GPIOA->OTYPER |= GPIO_OTYPER_OT_9 | GPIO_OTYPER_OT_10;
-	// i2c configuration, set up using table from table 74 in referene manual
-	I2C1->CR1 		&= ~(I2C_CR1_PE); // turn off the peripheral
-	I2C1->CR1 		|= I2C_CR1_RXIE; // receive interrupt enable
-	I2C1->CR2 		|= I2C_CR2_AUTOEND; // set the auto end mode so we don't need to send the stop bit
-	I2C1->TIMINGR |= ((0x01) << I2C_TIMINGR_PRESC_Pos) | ((0xC7) << I2C_TIMINGR_SCLL_Pos) | ((0xC3) << I2C_TIMINGR_SCLH_Pos) | ((0x2) << I2C_TIMINGR_SDADEL_Pos) | ((0x4) << I2C_TIMINGR_SCLDEL_Pos);
-	I2C1->CR2 		|= slave_add << I2C_CR2_SADD_Pos << 1; // write the slave address
-	I2C1->CR1 		|= I2C_CR1_PE; // turn on the peripheral
+	I2C_1_init();
 	
 	/********* ADC INIT *******/
 	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN; // enable the ADC
@@ -219,25 +189,6 @@ int main(void){
 	}
 }
 
-
-// sends the start bit
-void I2C_1_Start(void) {
-	
-	I2C1->CR2 |= I2C_CR2_START; // send start bit
-  while(!(I2C1->ISR & ~(I2C_ISR_TC_Msk)));// //wait for start bit, to go low, once the start bit and slave address is sent
-	
-}
-
-// write data to the 
-void I2C_1_Write(unsigned char DATA) {
-	
- I2C1->CR2 |= 0x1 << I2C_CR2_NBYTES_Pos; // send only one byte
- I2C1->TXDR = DATA; // send the data
- I2C1->CR2 |= I2C_CR2_START; // send start bit
- delay(4);
-
-}
-
 // write to the lcd
 void LCD_Write(unsigned char DATA, unsigned char command) {
 
@@ -258,30 +209,30 @@ void LCD_Write(unsigned char DATA, unsigned char command) {
 	port.DB = DATA >> 4; // write to the IO expander
 	
 	byte = port.E << 0 | port.RS << 1 | port.DB << 2 | port.LED << 6 | port.NC << 7;
-	I2C_1_Write(byte); // send to i2c
+	I2C_1_write(byte); // send to i2c
 
 	port.E = 0x1; // assert the E line
 	byte = port.E << 0 | port.RS << 1 | port.DB << 2 | port.LED << 6 | port.NC << 7;
-	I2C_1_Write(byte);
+	I2C_1_write(byte);
 
 	port.E = 0x0; // remove the E line
 	byte = port.E << 0 | port.RS << 1 | port.DB << 2 | port.LED << 6 | port.NC << 7;
-	I2C_1_Write(byte);
+	I2C_1_write(byte);
 	
 	
 	// send the lower nibble
 	port.DB = DATA; // write to the IO expander
 	
 	byte = port.E << 0 | port.RS << 1 | port.DB << 2 | port.LED << 6 | port.NC << 7;
-	I2C_1_Write(byte); // send to i2c
+	I2C_1_write(byte); // send to i2c
 
 	port.E = 0x1; // assert the E line
 	byte = port.E << 0 | port.RS << 1 | port.DB << 2 | port.LED << 6 | port.NC << 7;
-	I2C_1_Write(byte);
+	I2C_1_write(byte);
 
 	port.E = 0x0; // remove the E line
 	byte = port.E << 0 | port.RS << 1 | port.DB << 2 | port.LED << 6 | port.NC << 7;
-	I2C_1_Write(byte);
+	I2C_1_write(byte);
 	
 }
 
@@ -366,6 +317,3 @@ void EXTI0_1_IRQHandler(void) {
 		HAL_count++; // inc the counter
 	}
 }
-
-//throttle *= throttle_scale;
-//		

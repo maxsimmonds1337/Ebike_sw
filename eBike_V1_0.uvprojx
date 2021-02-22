@@ -373,7 +373,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>C:\Keil_v5\ARM\Pack\ARM\CMSIS\5.7.0\CMSIS\Include</IncludePath>
+              <IncludePath>C:\Keil_v5\ARM\Pack\ARM\CMSIS\5.7.0\CMSIS\Include;.\Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -420,6 +420,11 @@
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\main.c</FilePath>
+            </File>
+            <File>
+              <FileName>I2C.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Include\I2C.c</FilePath>
             </File>
           </Files>
         </Group>
