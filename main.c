@@ -1,14 +1,13 @@
 #include "stm32f0xx.h"                  // Device header
 #include <string.h>
 #include "I2C.h"
+#include "ADC.h"
 
 void delay (int ms);
 void delay_us(int us);
 
 void LCD_write_str(char *string);
 void LCD_Write(unsigned char DATA, unsigned char command);
-
-void ADC_EN(void);
 
 const int hall_counts_per_rot = 23; // number of counts per one wheel rotation
 const float wheel_diameter = 1;//  0.662; //meters
@@ -55,19 +54,7 @@ int main(void){
 	// SCL PA9
 	
 	I2C_1_init();
-	
-	/********* ADC INIT *******/
-	RCC->APB2ENR |= RCC_APB2ENR_ADC1EN; // enable the ADC
-	RCC->CR2 |= RCC_CR2_HSI14ON; /* (2) */
-	while ((RCC->CR2 & RCC_CR2_HSI14RDY) == 0) /* (3) */
-	{
-	 /* For robust implementation, add here time-out management */
-	}
-	ADC1->CFGR2 &= ~ADC_CFGR2_CKMODE; /* (1) */
-	
-	ADC1->CHSELR = ADC_CHSELR_CHSEL2;
-	ADC->CCR |= ADC_CCR_VREFEN;
-	ADC_EN();
+	ADC_init();
 
 	
 	/***** LCD INIT **********/
@@ -266,18 +253,6 @@ void delay_us (int us) 				//create simple delay loop
 	}
 }
 
-void ADC_EN(void) {
-if ((ADC1->ISR & ADC_ISR_ADRDY) != 0) /* (1) */
-{
- ADC1->ISR |= ADC_ISR_ADRDY; /* (2) */
-}
-ADC1->CR |= ADC_CR_ADEN; /* (3) */
-while ((ADC1->ISR & ADC_ISR_ADRDY) == 0) /* (4) */
-{
- /* For robust implementation, add here time-out management */
-}
-	
-}
 
 //interrupt service routine for the timer
 int TIM3_IRQHandler(void) {
@@ -287,7 +262,7 @@ int TIM3_IRQHandler(void) {
 	while ((ADC1->ISR & ADC_ISR_EOC) == 0); // Wait end of conversion
 	
 	// read the ADC DR and return
-	throttle = ADC1->DR;
+	throttle = ADC_read();
 	throttle /= (4095.0);
 	throttle *= 400.0;
 	duty_cycle = 405 - (unsigned int)(throttle); // set duty cycle
