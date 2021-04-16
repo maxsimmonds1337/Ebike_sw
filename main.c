@@ -10,6 +10,8 @@ void LCD_write_str(char *string);
 void LCD_Write(unsigned char DATA, unsigned char command);
 void ADC_EN(void);
 
+const float K_proportional = 1.0;
+const float K_integral = 1;
 
 const int hall_counts_per_rot = 23; // number of counts per one wheel rotation
 const float wheel_diameter = 1;//  0.662; //meters
@@ -53,7 +55,9 @@ static const struct IO_Expander IO_Clear;
 float throttle = 0.0;
 
 int digits[4]; // this will store the digits
-volatile int duty_cycle = 0;
+volatile int duty_cycle, old_duty_cycle = 0;
+volatile float errorIntegral = 0.0;
+
 
 //main loop
 int main(void){
@@ -109,7 +113,7 @@ int main(void){
 	/**** TIM3 INIT ******/
 	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN; // enable the timer
 	TIM3->PSC = 1000; 
-	TIM3->ARR = 1000; //125ms delay
+	TIM3->ARR = 100; //125ms delay
 	TIM3->DIER |= TIM_DIER_UIE; //enable timer interrupts
 	NVIC_EnableIRQ(TIM3_IRQn); // enable the IRQ
 	TIM3->CR1 |= TIM_CR1_CEN; //enable the counter
@@ -330,6 +334,7 @@ while ((ADC1->ISR & ADC_ISR_ADRDY) == 0) /* (4) */
 
 //interrupt service routine for the timer
 int TIM3_IRQHandler(void) {
+
   TIM3->SR = 0;		// clear the status reg
 	// start ADC acq.
 	ADC1->CR |= ADC_CR_ADSTART;
@@ -339,8 +344,19 @@ int TIM3_IRQHandler(void) {
 	throttle = ADC1->DR;
 	throttle /= (4095.0);
 	throttle *= 400.0;
-	duty_cycle = 405 - (unsigned int)(throttle); // set duty cycle
-	TIM1->CCR4 = duty_cycle;
+	
+	duty_cycle = (unsigned int)(throttle); // set duty cycle
+	
+	if( (duty_cycle - old_duty_cycle) > 1 ) {
+		duty_cycle = old_duty_cycle + 1;
+	}
+
+	if( (duty_cycle - old_duty_cycle) < -1 ) {
+		duty_cycle = old_duty_cycle - 1;
+	}
+
+	TIM1->CCR4 = 405 - (int)duty_cycle;
+	old_duty_cycle = (int)duty_cycle;
 	
 	return throttle;
 }
