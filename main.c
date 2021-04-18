@@ -55,6 +55,7 @@ static const struct IO_Expander IO_Clear;
 float throttle = 0.0;
 
 int digits[4]; // this will store the digits
+int ADC_Result[2];
 volatile int duty_cycle, old_duty_cycle = 0;
 volatile float errorIntegral = 0.0;
 
@@ -97,9 +98,12 @@ int main(void){
 	{
 	 /* For robust implementation, add here time-out management */
 	}
-	ADC1->CFGR2 &= ~ADC_CFGR2_CKMODE; /* (1) */
+	//ADC1->CFGR2 &= ~ADC_CFGR2_CKMODE; /* (1) */
 	
-	ADC1->CHSELR = ADC_CHSELR_CHSEL2;
+	ADC1->CHSELR = ADC_CHSELR_CHSEL0 | ADC_CHSELR_CHSEL2;
+	ADC1->SMPR |= ADC_SMPR_SMP_0 | ADC_SMPR_SMP_1 | ADC_SMPR_SMP_2; /* (3) */
+
+	
 	ADC->CCR |= ADC_CCR_VREFEN;
 	ADC_EN();
 
@@ -172,8 +176,8 @@ int main(void){
 	nSLEEP = 0x1; // 0 is sleep
 	
 	//dir - pa0
-	GPIOA->MODER |= GPIO_MODER_MODER0_0; // set pa1 as an output
-	GPIOA->ODR |= (dir << GPIO_ODR_0); // set the direction of the motor
+	GPIOA->MODER |= GPIO_MODER_MODER15_0; // set pa1 as an output
+	GPIOA->ODR |= (dir << GPIO_ODR_15); // set the direction of the motor
 	
 	//sleep - pa12
 	GPIOA->MODER |= GPIO_MODER_MODER12_0; // set pa1 as an output
@@ -335,10 +339,23 @@ while ((ADC1->ISR & ADC_ISR_ADRDY) == 0) /* (4) */
 //interrupt service routine for the timer
 int TIM3_IRQHandler(void) {
 
-  TIM3->SR = 0;		// clear the status reg
+	int i = 0;
+  
+	TIM3->SR = 0;		// clear the status reg
 	// start ADC acq.
-	ADC1->CR |= ADC_CR_ADSTART;
-	while ((ADC1->ISR & ADC_ISR_EOC) == 0); // Wait end of conversion
+	
+	for (i=0; i < 2; i++) {
+			ADC1->CR |= ADC_CR_ADSTART;
+
+		while ((ADC1->ISR & ADC_ISR_EOC) == 0){ /* Wait end of conversion */
+			/* For robust implementation, add here time-out management */
+		}
+		
+		ADC_Result[i] = ADC1->DR; /* Store the ADC conversion result */
+	
+	}
+	
+	//while ((ADC1->ISR & ADC_ISR_EOC) == 0); // Wait end of conversion
 	
 	// read the ADC DR and return
 	throttle = ADC1->DR;

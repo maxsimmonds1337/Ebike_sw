@@ -32,14 +32,18 @@ compiling system_stm32f0xx.c...
 compiling main.c...
 main.c(180): warning:  #63-D: shift count is too large
   	
+PIOA->ODR |= (dir << 
+PIO_ODR_15); // set the direction of the motor
+main.c(184): warning:  #63-D: shift count is too large
+  	
 PIOA->ODR |= (nSLEEP << 
 PIO_ODR_12); // 
 main.c(53): warning:  #177-D: variable "IO_Clear" was declared but never referenced
   static const struct IO_Expander IO_Clear;
-main.c: 2 warnings, 0 errors
+main.c: 3 warnings, 0 errors
 linking...
-Program Size: Code=5976 RO-data=400 RW-data=100 ZI-data=1668  
-".\Objects\eBike_V1_0.axf" - 0 Error(s), 2 Warning(s).
+Program Size: Code=6012 RO-data=400 RW-data=108 ZI-data=1668  
+".\Objects\eBike_V1_0.axf" - 0 Error(s), 3 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -56,9 +60,9 @@ Package Vendor: Keil
 <h2>Collection of Component Files used:</h2>
 
    * Component: Keil.Standalone::Device:Startup:1.0.0
+      Source file:   Drivers\CMSIS\Device\ST\STM32F0xx\Source\Templates\arm\startup_stm32f030x6.s
       Source file:   MDK\Device\Source\ARM\STM32F0xx_OPT.s
       Include file:  Drivers\CMSIS\Device\ST\STM32F0xx\Include\stm32f0xx.h
-      Source file:   Drivers\CMSIS\Device\ST\STM32F0xx\Source\Templates\arm\startup_stm32f030x6.s
       Source file:   Drivers\CMSIS\Device\ST\STM32F0xx\Source\Templates\system_stm32f0xx.c
 Build Time Elapsed:  00:00:01
 </pre>
