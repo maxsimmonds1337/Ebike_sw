@@ -34,7 +34,18 @@ int a,D = 0;
 
 double speed, speed_largest,speed_constant = 0.0; // var to hold the speed
 
-#define throttle_scale 0.80586  // 12 bit adc, 3v3 is full scale
+#define throttle_scale 0.80586  // 12 bit adc, 3v3 is full scale, factor of 1000 
+#define battery_scale 0.00081831501 // 12 bit adc, 3v3 is full scale
+#define resistor_scale 21.941 // 100k and 9.1k resistor divider
+
+
+// stuct to hold battery data and throttle position, used for writing to the display
+struct ebike_data {
+	
+	float throttle;
+	float vbatt;
+	
+} ebike_data;
 
 struct IO_Expander {
 	
@@ -50,20 +61,22 @@ struct IO_Expander {
 char slave_add = 0x20;
 
 char display_str[16];
-static const struct IO_Expander IO_Clear;
-
-float throttle = 0.0;
+//static const struct IO_Expander IO_Clear;
 
 int digits[4]; // this will store the digits
 int ADC_Result[2];
 volatile int duty_cycle, old_duty_cycle = 0;
 volatile float errorIntegral = 0.0;
 
+float vbatt, throttle = 0.0;
 
 //main loop
 int main(void){
 	
 	volatile int i, val = 0;
+	
+	ebike_data.throttle = 0.0;
+	ebike_data.vbatt = 0.0;
 	
 	delay(400); //wait 15ms
 	
@@ -100,14 +113,13 @@ int main(void){
 	}
 	//ADC1->CFGR2 &= ~ADC_CFGR2_CKMODE; /* (1) */
 	
-	ADC1->CHSELR = ADC_CHSELR_CHSEL0 | ADC_CHSELR_CHSEL2;
+	ADC1->CHSELR |= ADC_CHSELR_CHSEL2 | ADC_CHSELR_CHSEL0; // select both channels
 	ADC1->SMPR |= ADC_SMPR_SMP_0 | ADC_SMPR_SMP_1 | ADC_SMPR_SMP_2; /* (3) */
 
 	
 	ADC->CCR |= ADC_CCR_VREFEN;
 	ADC_EN();
 
-	
 	/***** LCD INIT **********/
 	LCD_Write(0x28,1); // ensure you're using 5v if using two lines displays
 	LCD_Write(0x01,1);
@@ -159,13 +171,13 @@ int main(void){
 	TIM1->EGR |= TIM_EGR_UG;
 	TIM1->CR1 |= TIM_CR1_CEN;
 
-	strcpy(display_str, "Speed ");
-	LCD_write_str(display_str);
+	//strcpy(display_str, "Speed ");
+	//LCD_write_str(display_str);
 	
-	LCD_Write(0xC0, 0x1); // set the ddram address to row 2 col 1
+	//LCD_Write(0xC0, 0x1); // set the ddram address to row 2 col 1
 
-	strcpy(display_str, "Throttle = ");
-	LCD_write_str(display_str);
+	//strcpy(display_str, "Throttle = ");
+	//LCD_write_str(display_str);
 	
 	/****** set up the bldc io *******/
 	
@@ -181,7 +193,7 @@ int main(void){
 	
 	//sleep - pa12
 	GPIOA->MODER |= GPIO_MODER_MODER12_0; // set pa1 as an output
-	GPIOA->ODR |= (nSLEEP << GPIO_ODR_12); // 
+	//GPIOA->ODR |= (nSLEEP << GPIO_ODR_12); // 
 	
 	//brake - pa3
 	GPIOA->MODER |= GPIO_MODER_MODER3_0; // set pa1 as an output
@@ -190,11 +202,30 @@ int main(void){
 	// inputs
 	//nFAULT
 	
+	
+	// set up the screen with constants (ie, things that aren't changing)
+	LCD_Write(0x80+0x3, 0x1); // set the ddram address to row 1 col 3
+	strcpy(display_str, "MPH");
+	LCD_write_str(display_str);
+	
+	//voltage
+	LCD_Write(0xC0+0x2, 0x1); // set the ddram address to row 2 col 3
+	LCD_Write('.', 0x0); // decimal point for voltage
+	LCD_Write(0xC0+0x4, 0x1); //set the cursor for the units
+	LCD_Write('V', 0x0);	// units for battery voltage
+	
+	// throttle position
+	LCD_Write(0xC0 + 0xE, 0x1);
+	LCD_Write('%', 0x0);
+	
 	while(1){
 		
 		delay(10);
+		
+		vbatt = ebike_data.vbatt;
+		throttle = ebike_data.throttle;
 	
-		LCD_Write(0x86, 0x1); // set the ddram address to row 2 col 1
+		LCD_Write(0x80, 0x1); // set the ddram address to row 2 col 1
 		speed = ((HAL_count_frozen * cir/hall_counts_per_rot) / 0.5) * mps_mph; // calculate the speed, in mph
 	
 		// TODO make this a function
@@ -202,12 +233,25 @@ int main(void){
 			digits[i] = (int)speed % 10;
 			speed /= 10;
 		}
-		
+		//mph
 		LCD_Write('0' + digits[1], 0x0);
 		LCD_Write('0' + digits[0], 0x0);
 		
-		strcpy(display_str, " MPH");
-		LCD_write_str(display_str);
+		
+		LCD_Write(0xC0, 0x1); // set the ddram address to row 2 col 1
+		vbatt *= 10;
+		for(i = 0; i < 3; i++) {
+			digits[i] = (int)vbatt % 10;
+			vbatt /= 10;
+		}
+		
+		//voltage
+		LCD_Write('0' + digits[2], 0x0);
+		LCD_Write('0' + digits[1], 0x0);
+		LCD_Write(0xC0+0x3, 0x1);
+		//decimal point is already written
+		LCD_Write('0' + digits[0], 0x0);
+		// the units is already written
 		
 		LCD_Write(0xC0+0xB, 0x1); // set the ddram address to row 2 col 1
 		throttle /= 4;
@@ -218,8 +262,7 @@ int main(void){
 		
 		LCD_Write('0' + digits[2], 0x0);
 		LCD_Write('0' + digits[1], 0x0);
-		LCD_Write('0' + digits[0], 0x0);
-		LCD_Write('%', 0x0);
+		LCD_Write('0' + digits[0], 0x0);		
 		
 		LCD_Write(0x2, 0x1);
 //		
@@ -337,15 +380,16 @@ while ((ADC1->ISR & ADC_ISR_ADRDY) == 0) /* (4) */
 }
 
 //interrupt service routine for the timer
-int TIM3_IRQHandler(void) {
+void TIM3_IRQHandler(void) {
 
 	int i = 0;
   
 	TIM3->SR = 0;		// clear the status reg
 	// start ADC acq.
 	
+	ADC1->CR |= ADC_CR_ADSTART;
+	
 	for (i=0; i < 2; i++) {
-			ADC1->CR |= ADC_CR_ADSTART;
 
 		while ((ADC1->ISR & ADC_ISR_EOC) == 0){ /* Wait end of conversion */
 			/* For robust implementation, add here time-out management */
@@ -355,14 +399,16 @@ int TIM3_IRQHandler(void) {
 	
 	}
 	
+	ebike_data.vbatt = (ADC_Result[0] * battery_scale) * resistor_scale;
+	
 	//while ((ADC1->ISR & ADC_ISR_EOC) == 0); // Wait end of conversion
 	
 	// read the ADC DR and return
-	throttle = ADC1->DR;
-	throttle /= (4095.0);
-	throttle *= 400.0;
+	ebike_data.throttle = ADC_Result[1];
+	ebike_data.throttle /= (4095.0);
+	ebike_data.throttle *= 400.0;
 	
-	duty_cycle = (unsigned int)(throttle); // set duty cycle
+	duty_cycle = (unsigned int)ebike_data.throttle; // set duty cycle
 	
 	if( (duty_cycle - old_duty_cycle) > 1 ) {
 		duty_cycle = old_duty_cycle + 1;
@@ -375,7 +421,7 @@ int TIM3_IRQHandler(void) {
 	TIM1->CCR4 = 405 - (int)duty_cycle;
 	old_duty_cycle = (int)duty_cycle;
 	
-	return throttle;
+	//return ebike_data;
 }
 
 //interrupt service routine for the timer
