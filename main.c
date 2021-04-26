@@ -170,6 +170,7 @@ int main(void){
 	TIM1->BDTR |= TIM_BDTR_MOE;
 	TIM1->EGR |= TIM_EGR_UG;
 	TIM1->CR1 |= TIM_CR1_CEN;
+	//TIM1->CCR4 = 405; // to stop the inital 100% duy cycle
 
 	//strcpy(display_str, "Speed ");
 	//LCD_write_str(display_str);
