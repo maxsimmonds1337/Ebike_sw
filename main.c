@@ -170,7 +170,7 @@ int main(void){
 	TIM1->BDTR |= TIM_BDTR_MOE;
 	TIM1->EGR |= TIM_EGR_UG;
 	TIM1->CR1 |= TIM_CR1_CEN;
-	//TIM1->CCR4 = 405; // to stop the inital 100% duy cycle
+	TIM1->CCR4 = 405; // to stop the inital 100% duy cycle
 
 	//strcpy(display_str, "Speed ");
 	//LCD_write_str(display_str);
@@ -219,9 +219,13 @@ int main(void){
 	LCD_Write(0xC0 + 0xE, 0x1);
 	LCD_Write('%', 0x0);
 	
+	port.LED = 0x1; // turn on the display
+	
 	while(1){
 		
-		delay(10);
+		delay(500);
+		
+//		port.LED = ~(port.LED); // turn on the display
 		
 		vbatt = ebike_data.vbatt;
 		throttle = ebike_data.throttle;
