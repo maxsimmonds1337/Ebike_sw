@@ -119,6 +119,8 @@ int main(void){
 	
 	ADC->CCR |= ADC_CCR_VREFEN;
 	ADC_EN();
+	
+	delay(5000); // half a second delay before initialising the LCD
 
 	/***** LCD INIT **********/
 	LCD_Write(0x28,1); // ensure you're using 5v if using two lines displays
@@ -338,6 +340,7 @@ void LCD_Write(unsigned char DATA, unsigned char command) {
 	port.E = 0x0; // remove the E line
 	byte = port.E << 0 | port.RS << 1 | port.DB << 2 | port.LED << 6 | port.NC << 7;
 	I2C_1_Write(byte);
+	
 	
 }
 
